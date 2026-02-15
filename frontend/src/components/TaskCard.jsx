@@ -7,8 +7,16 @@ const priorityColors = {
   critical: { bg: '#fecaca', color: '#991b1b' },
 };
 
+const priorityLabels = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  critical: 'Critical',
+};
+
 export default function TaskCard({ task, onEdit, onDelete, canEdit, canDelete }) {
   const pColor = priorityColors[task.priority] || priorityColors.medium;
+  const pLabel = priorityLabels[task.priority] || 'Medium';
 
   return (
     <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -16,7 +24,7 @@ export default function TaskCard({ task, onEdit, onDelete, canEdit, canDelete })
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 600 }}>{task.title}</h3>
           <span className={`badge ${task.status}`}>{task.status}</span>
-          <span className="badge" style={{ background: pColor.bg, color: pColor.color }}>{task.priority}</span>
+          <span className="badge" style={{ background: pColor.bg, color: pColor.color }}>{pLabel}</span>
         </div>
         {task.description && (
           <p style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>{task.description}</p>
