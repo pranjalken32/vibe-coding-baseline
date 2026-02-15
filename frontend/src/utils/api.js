@@ -38,4 +38,11 @@ export const api = {
   getAuditLogs: (query = '') => request('GET', `/orgs/${getOrgId()}/audit-logs${query}`),
   getUsers: () => request('GET', `/orgs/${getOrgId()}/users`),
   updateUserRole: (id, role) => request('PUT', `/orgs/${getOrgId()}/users/${id}/role`, { role }),
+
+  getNotifications: (query = '') => request('GET', `/notifications${query}`),
+  getUnreadCount: () => request('GET', '/notifications/unread-count'),
+  markNotificationRead: (id) => request('PUT', `/notifications/${id}/read`),
+  markAllNotificationsRead: () => request('PUT', '/notifications/read-all'),
+  getNotificationPrefs: () => request('GET', '/notifications/preferences'),
+  updateNotificationPrefs: (prefs) => request('PUT', '/notifications/preferences', prefs),
 };

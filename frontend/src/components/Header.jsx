@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import NotificationBell from './NotificationBell';
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -16,6 +17,8 @@ export default function Header() {
           {(user.role === 'admin' || user.role === 'manager') && (
             <Link to="/audit-logs">Audit Logs</Link>
           )}
+          <Link to="/notification-preferences">Preferences</Link>
+          <NotificationBell />
           <span style={{ color: '#6b7280', fontSize: '14px' }}>
             {user.name} ({user.role})
           </span>
