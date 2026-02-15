@@ -511,7 +511,7 @@ function checkFeatureIntegration() {
     },
   ];
 
-  let evaluatedCount = 0;
+  const featureScores = [];
   for (const feature of featureChecks) {
     let attempted = false;
     try { attempted = feature.detect(); } catch { attempted = false; }
@@ -521,28 +521,29 @@ function checkFeatureIntegration() {
       continue;
     }
 
-    evaluatedCount++;
     const passedChecks = feature.checks.filter(c => {
       try { return c.test(); } catch { return false; }
     });
-    const allPassed = passedChecks.length === feature.checks.length;
-    const nonePassed = passedChecks.length === 0;
+    const passRate = passedChecks.length / feature.checks.length;
+    featureScores.push(passRate);
 
-    if (allPassed) {
+    if (passRate === 1) {
       results.expectedFeatures.push({ name: feature.name, status: 'integrated', detail: `${passedChecks.length}/${feature.checks.length} checks passed` });
-    } else if (!nonePassed) {
+    } else if (passRate > 0) {
       results.expectedFeatures.push({ name: feature.name, status: 'partial', detail: `${passedChecks.length}/${feature.checks.length} checks passed` });
       const missing = feature.checks.filter(c => { try { return !c.test(); } catch { return true; } });
       missing.forEach(m => results.missingFeatures.push(`${feature.name}: ${m.desc}`));
-      results.score -= Math.round(30 / Math.max(evaluatedCount, 1));
     } else {
-      results.expectedFeatures.push({ name: feature.name, status: 'not_integrated', detail: 'attempted but not in backend/frontend' });
-      results.missingFeatures.push(`${feature.name}: code exists outside backend/frontend but not integrated`);
-      results.score -= Math.round(40 / Math.max(evaluatedCount, 1));
+      results.expectedFeatures.push({ name: feature.name, status: 'not_integrated', detail: 'attempted but 0 checks passed' });
+      results.missingFeatures.push(`${feature.name}: code exists but not properly integrated`);
     }
   }
 
-  results.score = Math.max(0, results.score);
+  if (featureScores.length > 0) {
+    const avgPassRate = featureScores.reduce((a, b) => a + b, 0) / featureScores.length;
+    results.score = Math.round(avgPassRate * 100);
+  }
+
   return results;
 }
 
