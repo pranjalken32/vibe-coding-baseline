@@ -1,60 +1,52 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../utils/api';
 
 export default function Register() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [orgName, setOrgName] = useState('');
+  const [form, setForm] = useState({ name: '', email: '', password: '', orgName: '' });
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError('');
-    setLoading(true);
     try {
-      await register(name, email, password, orgName);
+      const res = await api.register(form);
+      login(res.data.token, res.data.user);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed');
-    } finally {
-      setLoading(false);
+      setError(err.message);
     }
-  };
+  }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px' }}>Create Account</h1>
-        <p style={{ color: '#666', marginBottom: '24px' }}>Enterprise Task Manager</p>
-        {error && <p className="error-message" style={{ marginBottom: '12px' }}>{error}</p>}
+    <div className="auth-container">
+      <div className="auth-card">
+        <h1>Register</h1>
+        {error && <div className="error-msg">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Organization Name</label>
-            <input value={orgName} onChange={(e) => setOrgName(e.target.value)} required placeholder="My Company" />
+            <input value={form.orgName} onChange={e => setForm({ ...form, orgName: e.target.value })} placeholder="My Company" required />
           </div>
           <div className="form-group">
             <label>Full Name</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} required />
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
           </div>
           <div className="form-group">
             <label>Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
           </div>
           <div className="form-group">
             <label>Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+            <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required />
           </div>
-          <button type="submit" className="primary" style={{ width: '100%', marginTop: '8px' }} disabled={loading}>
-            {loading ? 'Creating account...' : 'Create Account'}
-          </button>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Create Account</button>
         </form>
         <p style={{ textAlign: 'center', marginTop: '16px', fontSize: '14px' }}>
-          Already have an account? <Link to="/login">Sign In</Link>
+          Have an account? <Link to="/login">Sign In</Link>
         </p>
       </div>
     </div>

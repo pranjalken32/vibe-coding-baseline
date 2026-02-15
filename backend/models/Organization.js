@@ -1,27 +1,12 @@
 const mongoose = require('mongoose');
 
 const organizationSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-  },
-  slug: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-    trim: true,
-  },
-  plan: {
-    type: String,
-    enum: ['free', 'pro', 'enterprise'],
-    default: 'free',
-  },
+  name: { type: String, required: true },
+  slug: { type: String, required: true, unique: true },
+  plan: { type: String, enum: ['free', 'pro', 'enterprise'], default: 'free' },
   settings: {
-    timezone: { type: String, default: 'UTC' },
-    language: { type: String, default: 'en' },
+    maxUsers: { type: Number, default: 10 },
+    maxTasks: { type: Number, default: 100 },
   },
 }, { timestamps: true });
 

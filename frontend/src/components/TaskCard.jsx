@@ -1,22 +1,12 @@
-import React from 'react';
-
 const priorityColors = {
-  low: { bg: '#e8ecef', color: '#555' },
+  low: { bg: '#d1fae5', color: '#065f46' },
   medium: { bg: '#dbeafe', color: '#1e40af' },
-  high: { bg: '#fed7aa', color: '#c2410c' },
+  high: { bg: '#fed7aa', color: '#9a3412' },
   critical: { bg: '#fecaca', color: '#991b1b' },
-};
-
-const priorityLabels = {
-  low: 'Low',
-  medium: 'Medium',
-  high: 'High',
-  critical: 'Critical',
 };
 
 export default function TaskCard({ task, onEdit, onDelete, canEdit, canDelete }) {
   const pColor = priorityColors[task.priority] || priorityColors.medium;
-  const pLabel = priorityLabels[task.priority] || 'Medium';
 
   return (
     <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -24,39 +14,19 @@ export default function TaskCard({ task, onEdit, onDelete, canEdit, canDelete })
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 600 }}>{task.title}</h3>
           <span className={`badge ${task.status}`}>{task.status}</span>
-          <span className="badge" style={{ background: pColor.bg, color: pColor.color }}>{pLabel}</span>
+          <span className="badge" style={{ background: pColor.bg, color: pColor.color }}>{task.priority}</span>
         </div>
         {task.description && (
           <p style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>{task.description}</p>
         )}
-        <div style={{ fontSize: '13px', color: '#999', display: 'flex', gap: '16px' }}>
-          {task.assigneeId && (
-            <span>Assigned to: {task.assigneeId.name || 'Unknown'}</span>
-          )}
-          {task.dueDate && (
-            <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
-          )}
-          <span>Created by: {task.createdBy?.name || 'Unknown'}</span>
+        <div style={{ fontSize: '12px', color: '#9ca3af' }}>
+          {task.assigneeId?.name && <span>Assigned to: {task.assigneeId.name}</span>}
+          {task.dueDate && <span style={{ marginLeft: '12px' }}>Due: {new Date(task.dueDate).toLocaleDateString()}</span>}
         </div>
-        {task.tags && task.tags.length > 0 && (
-          <div style={{ marginTop: '6px', display: 'flex', gap: '4px' }}>
-            {task.tags.map((tag) => (
-              <span key={tag} style={{ background: '#f3f4f6', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>{tag}</span>
-            ))}
-          </div>
-        )}
       </div>
-      <div style={{ display: 'flex', gap: '8px', marginLeft: '12px' }}>
-        {canEdit && (
-          <button className="secondary" onClick={() => onEdit(task)} style={{ padding: '4px 10px', fontSize: '13px' }}>
-            Edit
-          </button>
-        )}
-        {canDelete && (
-          <button className="danger" onClick={() => onDelete(task._id)} style={{ padding: '4px 10px', fontSize: '13px' }}>
-            Delete
-          </button>
-        )}
+      <div style={{ display: 'flex', gap: '6px' }}>
+        {canEdit && <button className="btn btn-primary" onClick={() => onEdit(task)} style={{ padding: '4px 10px', fontSize: '12px' }}>Edit</button>}
+        {canDelete && <button className="btn btn-danger" onClick={() => onDelete(task._id)} style={{ padding: '4px 10px', fontSize: '12px' }}>Delete</button>}
       </div>
     </div>
   );
