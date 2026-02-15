@@ -1,48 +1,40 @@
 const express = require('express');
 const Task = require('../models/Task');
-const authMiddleware = require('../middleware/auth');
+const User = require('../models/User');
+const { authMiddleware } = require('../middleware/auth');
 
-const router = express.Router({ mergeParams: true });
+const router = express.Router();
 
 router.use(authMiddleware);
 
-router.get('/summary', async (req, res) => {
+router.get('/stats', async (req, res) => {
   try {
-    const baseFilter = { orgId: req.user.orgId };
+    const { orgId } = req.user;
 
-    if (req.user.role === 'member') {
-      baseFilter.assigneeId = req.user._id;
-    }
-
-    const [statusCounts, priorityCounts, totalTasks, overdueTasks] = await Promise.all([
-      Task.aggregate([
-        { $match: baseFilter },
-        { $group: { _id: '$status', count: { $sum: 1 } } },
-      ]),
-      Task.aggregate([
-        { $match: baseFilter },
-        { $group: { _id: '$priority', count: { $sum: 1 } } },
-      ]),
-      Task.countDocuments(baseFilter),
-      Task.countDocuments({ ...baseFilter, dueDate: { $lt: new Date() }, status: { $ne: 'done' } }),
+    const [totalTasks, openTasks, inProgressTasks, doneTasks, totalUsers] = await Promise.all([
+      Task.countDocuments({ orgId }),
+      Task.countDocuments({ orgId, status: 'open' }),
+      Task.countDocuments({ orgId, status: 'in_progress' }),
+      Task.countDocuments({ orgId, status: 'done' }),
+      User.countDocuments({ orgId }),
     ]);
 
-    const byStatus = {};
-    statusCounts.forEach(s => { byStatus[s._id] = s.count; });
-
-    const byPriority = {};
-    priorityCounts.forEach(p => { byPriority[p._id] = p.count; });
+    const overdueTasks = await Task.countDocuments({
+      orgId,
+      dueDate: { $lt: new Date() },
+      status: { $ne: 'done' },
+    });
 
     res.json({
       success: true,
       data: {
         totalTasks,
+        openTasks,
+        inProgressTasks,
+        doneTasks,
         overdueTasks,
-        byStatus,
-        byPriority,
-        completionRate: totalTasks > 0
-          ? Math.round(((byStatus['done'] || 0) / totalTasks) * 100)
-          : 0,
+        totalUsers,
+        completionRate: totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0,
       },
       error: null,
     });

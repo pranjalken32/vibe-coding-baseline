@@ -1,33 +1,30 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-async function authMiddleware(req, res, next) {
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+
+function authMiddleware(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, data: null, error: 'No token provided' });
+  }
+
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, data: null, error: 'No token provided' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    const user = await User.findById(decoded.userId).select('-passwordHash');
-    if (!user) {
-      return res.status(401).json({ success: false, data: null, error: 'User not found' });
-    }
-
-    req.user = {
-      _id: user._id,
-      orgId: user.orgId,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    };
-
+    const token = header.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
     next();
-  } catch (err) {
+  } catch {
     return res.status(401).json({ success: false, data: null, error: 'Invalid token' });
   }
 }
 
-module.exports = authMiddleware;
+function generateToken(user) {
+  return jwt.sign(
+    { id: user._id, orgId: user.orgId, role: user.role, email: user.email },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+}
+
+module.exports = { authMiddleware, generateToken, JWT_SECRET };

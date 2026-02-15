@@ -14,7 +14,6 @@ const EXPECTED_MODELS = {
 };
 
 const EXPECTED_ROUTES_PATTERN = /\/api\/v1\//;
-const ORG_SCOPED_PATTERN = /\/orgs\/:orgId\//;
 
 function getAllFiles(dir, ext, files = []) {
   if (!fs.existsSync(dir)) return files;
@@ -440,7 +439,7 @@ function checkStructuralIntegrity() {
     }
   }
 
-  const platformFiles = ['.replit', 'replit.md', '.bolt', 'vercel.json', 'netlify.toml', '.cursorrules'];
+  const platformFiles = ['.replit', 'replit.md', '.bolt', 'vercel.json', 'netlify.toml', '.cursorrules', '.windsurf'];
   for (const pf of platformFiles) {
     if (fs.existsSync(path.join(ROOT_DIR, pf))) {
       results.platformArtifacts.push(pf);
@@ -459,7 +458,7 @@ function checkFeatureIntegration() {
   const results = { expectedFeatures: [], missingFeatures: [], score: 100 };
   const serverFile = readFile(path.join(BACKEND_DIR, 'server.js'));
   const ROOT_DIR = __dirname;
-  const excludeFromDetect = new Set(['measure.js', 'package.json', 'package-lock.json', 'replit.md', '.replit']);
+  const excludeFromDetect = new Set(['measure.js', 'package.json', 'package-lock.json', 'replit.md', '.replit', '.windsurf']);
   const featureFiles = getAllFiles(ROOT_DIR, null).filter(f => {
     const base = path.basename(f);
     return !f.includes('node_modules') && !f.includes('.git') && !f.includes('measurement-results') && !excludeFromDetect.has(base);
@@ -471,9 +470,10 @@ function checkFeatureIntegration() {
     {
       name: 'Notifications',
       detect: () => {
-        const hasNotifFile = featureFileNames.some(f => f.includes('notif'));
-        const hasNotifComponent = featureContents.some(c => c.includes('notification') && (c.includes('schema') || c.includes('router.') || c.includes('bell') || c.includes('usestate')));
-        return hasNotifFile || hasNotifComponent;
+        const hasNotifFile = featureFileNames.some(f => f.includes('notif') && !f.includes('user'));
+        const hasNotifRoute = featureContents.some(c => c.includes('notification') && (c.includes('router.get') || c.includes('router.post')));
+        const hasNotifComponent = featureContents.some(c => c.includes('notification') && (c.includes('bell') || c.includes('usestate')) && !c.includes('notificationprefs'));
+        return hasNotifFile || hasNotifRoute || hasNotifComponent;
       },
       checks: [
         { desc: 'Notification model in backend/models', test: () => fs.existsSync(path.join(BACKEND_DIR, 'models', 'Notification.js')) || getAllFiles(path.join(BACKEND_DIR, 'models'), '.js').some(f => { const c = readFile(f); return c.includes('notification') && c.includes('Schema'); }) },
@@ -643,7 +643,7 @@ function generateReport() {
   metrics.featureIntegration = feat.score;
   console.log(`  Score: ${feat.score}/100`);
   for (const f of feat.expectedFeatures) {
-    const icon = f.status === 'integrated' ? '✓' : f.status === 'partial' ? '◐' : '○';
+    const icon = f.status === 'integrated' ? '✓' : f.status === 'partial' ? '◐' : f.status === 'not_integrated' ? '✗' : '○';
     console.log(`  ${icon} ${f.name}: ${f.status} (${f.detail})`);
   }
   feat.missingFeatures.forEach(m => console.log(`  ✗ ${m}`));
@@ -672,7 +672,6 @@ function generateReport() {
 
   console.log('\n' + '='.repeat(70));
 
-  // Write results to JSON
   const output = {
     timestamp: new Date().toISOString(),
     compositeScore: parseFloat(compositeScore),

@@ -1,55 +1,48 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../utils/api';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [orgSlug, setOrgSlug] = useState('');
+  const [form, setForm] = useState({ email: '', password: '', orgSlug: '' });
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError('');
-    setLoading(true);
     try {
-      await login(email, password, orgSlug || undefined);
+      const res = await api.login(form);
+      login(res.data.token, res.data.user);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed');
-    } finally {
-      setLoading(false);
+      setError(err.message);
     }
-  };
+  }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px' }}>Sign In</h1>
-        <p style={{ color: '#666', marginBottom: '24px' }}>Enterprise Task Manager</p>
-        {error && <p className="error-message" style={{ marginBottom: '12px' }}>{error}</p>}
+    <div className="auth-container">
+      <div className="auth-card">
+        <h1>Sign In</h1>
+        {error && <div className="error-msg">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Organization Slug</label>
-            <input value={orgSlug} onChange={(e) => setOrgSlug(e.target.value)} placeholder="my-company" />
+            <input value={form.orgSlug} onChange={e => setForm({ ...form, orgSlug: e.target.value })} placeholder="my-company" required />
           </div>
           <div className="form-group">
             <label>Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
           </div>
           <div className="form-group">
             <label>Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required />
           </div>
-          <button type="submit" className="primary" style={{ width: '100%', marginTop: '8px' }} disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Sign In</button>
         </form>
         <p style={{ textAlign: 'center', marginTop: '16px', fontSize: '14px' }}>
-          Don't have an account? <Link to="/register">Register</Link>
+          No account? <Link to="/register">Register</Link>
         </p>
       </div>
     </div>

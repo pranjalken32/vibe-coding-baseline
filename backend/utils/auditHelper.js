@@ -9,10 +9,10 @@ async function logAudit({ orgId, userId, action, resource, resourceId, changes, 
       resource,
       resourceId,
       changes,
-      ipAddress,
+      ipAddress: ipAddress || 'unknown',
     });
   } catch (err) {
-    console.error('Audit log error:', err.message);
+    console.error('Audit log failed:', err.message);
   }
 }
 
