@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const notificationSchema = new mongoose.Schema({
   orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', required: true },
   recipientId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  type: { type: String, enum: ['task_assigned', 'task_status_changed'], required: true },
+  type: { type: String, enum: ['task_assigned', 'task_status_changed', 'task_mentioned'], required: true },
   title: { type: String, required: true },
   message: { type: String, required: true },
   taskId: { type: mongoose.Schema.Types.ObjectId, ref: 'Task' },

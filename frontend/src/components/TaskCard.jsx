@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 const priorityColors = {
   low: { bg: '#d1fae5', color: '#065f46' },
   medium: { bg: '#dbeafe', color: '#1e40af' },
@@ -19,7 +21,11 @@ export default function TaskCard({ task, onEdit, onDelete, canEdit, canDelete })
     <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 600 }}>{task.title}</h3>
+          <h3 style={{ fontSize: '16px', fontWeight: 600 }}>
+            <Link to={`/tasks/${task._id}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+              {task.title}
+            </Link>
+          </h3>
           <span className={`badge ${task.status}`}>{task.status}</span>
           <span className="badge" style={{ background: pColor.bg, color: pColor.color }}>{priorityLabel}</span>
         </div>

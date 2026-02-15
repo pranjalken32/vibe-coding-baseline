@@ -1,13 +1,106 @@
 const express = require('express');
 const Task = require('../models/Task');
+const TaskActivity = require('../models/TaskActivity');
+const User = require('../models/User');
 const { authMiddleware } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
 const { logAudit } = require('../utils/auditHelper');
-const { notifyTaskAssigned, notifyTaskStatusChanged } = require('../utils/notificationHelper');
+const { notifyTaskAssigned, notifyTaskStatusChanged, notifyTaskMentioned } = require('../utils/notificationHelper');
 
 const router = express.Router();
 
 router.use(authMiddleware);
+
+function extractMentionEmails(body) {
+  if (!body || typeof body !== 'string') return [];
+  const matches = body.match(/@([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi) || [];
+  return [...new Set(matches.map(m => m.slice(1).toLowerCase()))];
+}
+
+async function populateActivity(activityDoc) {
+  return TaskActivity.findById(activityDoc._id)
+    .populate('actorId', 'name email')
+    .populate('fromAssigneeId', 'name email')
+    .populate('toAssigneeId', 'name email')
+    .populate('comment.mentions', 'name email');
+}
+
+router.get('/:id/activity', checkPermission('read', 'tasks'), async (req, res) => {
+  try {
+    const { orgId } = req.user;
+    const { limit = 50 } = req.query;
+
+    const task = await Task.findOne({ _id: req.params.id, orgId }).select('_id');
+    if (!task) {
+      return res.status(404).json({ success: false, data: null, error: 'Task not found' });
+    }
+
+    const items = await TaskActivity.find({ orgId, taskId: task._id })
+      .sort({ createdAt: -1 })
+      .limit(Number(limit))
+      .populate('actorId', 'name email')
+      .populate('fromAssigneeId', 'name email')
+      .populate('toAssigneeId', 'name email')
+      .populate('comment.mentions', 'name email');
+
+    res.json({ success: true, data: items, error: null });
+  } catch (err) {
+    res.status(500).json({ success: false, data: null, error: err.message });
+  }
+});
+
+router.post('/:id/comments', checkPermission('read', 'tasks'), async (req, res) => {
+  try {
+    const { orgId, id: userId } = req.user;
+    const { body } = req.body;
+
+    if (!body || typeof body !== 'string' || body.trim().length === 0) {
+      return res.status(400).json({ success: false, data: null, error: 'Comment body is required' });
+    }
+
+    const task = await Task.findOne({ _id: req.params.id, orgId })
+      .populate('createdBy', 'name email');
+    if (!task) {
+      return res.status(404).json({ success: false, data: null, error: 'Task not found' });
+    }
+
+    const mentionEmails = extractMentionEmails(body);
+    const mentionedUsers = mentionEmails.length
+      ? await User.find({ orgId, email: { $in: mentionEmails } }).select('_id name email')
+      : [];
+    const mentionedUserIds = mentionedUsers.map(u => u._id);
+
+    const activity = await TaskActivity.create({
+      orgId,
+      taskId: task._id,
+      type: 'comment',
+      actorId: userId,
+      comment: {
+        body: body.trim(),
+        mentions: mentionedUserIds,
+      },
+    });
+
+    await logAudit({
+      orgId,
+      userId,
+      action: 'create',
+      resource: 'task_comment',
+      resourceId: task._id,
+      changes: { taskId: task._id, mentions: mentionEmails },
+      ipAddress: req.ip,
+    });
+
+    for (const mentionedUser of mentionedUsers) {
+      await notifyTaskMentioned({ orgId, task, mentionedUserId: mentionedUser._id, mentionedBy: userId });
+    }
+
+    const populated = await populateActivity(activity);
+    res.status(201).json({ success: true, data: populated, error: null });
+  } catch (err) {
+    res.status(500).json({ success: false, data: null, error: err.message });
+  }
+});
 
 router.get('/', checkPermission('read', 'tasks'), async (req, res) => {
   try {
@@ -82,6 +175,17 @@ router.post('/', checkPermission('create', 'tasks'), async (req, res) => {
       dueDate,
     });
 
+    if (assigneeId) {
+      await TaskActivity.create({
+        orgId,
+        taskId: task._id,
+        type: 'assigned',
+        actorId: userId,
+        fromAssigneeId: null,
+        toAssigneeId: assigneeId,
+      });
+    }
+
     await logAudit({
       orgId,
       userId,
@@ -112,7 +216,7 @@ router.put('/:id', checkPermission('update', 'tasks'), async (req, res) => {
       return res.status(404).json({ success: false, data: null, error: 'Task not found' });
     }
 
-    const oldValues = { status: task.status, priority: task.priority, title: task.title };
+    const oldValues = { status: task.status, priority: task.priority, title: task.title, assigneeId: task.assigneeId };
     const oldAssigneeId = task.assigneeId ? String(task.assigneeId) : null;
     const oldStatus = task.status;
 
@@ -122,6 +226,36 @@ router.put('/:id', checkPermission('update', 'tasks'), async (req, res) => {
 
     Object.assign(task, updates);
     await task.save();
+
+    const activityToInsert = [];
+    if (updates.status && updates.status !== oldStatus) {
+      activityToInsert.push({
+        orgId,
+        taskId: task._id,
+        type: 'status_changed',
+        actorId: userId,
+        oldStatus,
+        newStatus: updates.status,
+      });
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'assigneeId')) {
+      const newAssigneeId = updates.assigneeId ? String(updates.assigneeId) : null;
+      if (newAssigneeId !== oldAssigneeId) {
+        activityToInsert.push({
+          orgId,
+          taskId: task._id,
+          type: newAssigneeId ? 'assigned' : 'unassigned',
+          actorId: userId,
+          fromAssigneeId: oldAssigneeId,
+          toAssigneeId: newAssigneeId,
+        });
+      }
+    }
+
+    if (activityToInsert.length) {
+      await TaskActivity.insertMany(activityToInsert);
+    }
 
     await logAudit({
       orgId,

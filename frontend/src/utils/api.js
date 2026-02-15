@@ -34,6 +34,9 @@ export const api = {
   updateTask: (id, body) => request('PUT', `/orgs/${getOrgId()}/tasks/${id}`, body),
   deleteTask: (id) => request('DELETE', `/orgs/${getOrgId()}/tasks/${id}`),
 
+  getTaskActivity: (id, query = '') => request('GET', `/orgs/${getOrgId()}/tasks/${id}/activity${query}`),
+  addTaskComment: (id, body) => request('POST', `/orgs/${getOrgId()}/tasks/${id}/comments`, body),
+
   // Reports
   getStatusDistribution: () => request('GET', `/orgs/${getOrgId()}/reports/distribution/status`),
   getPriorityDistribution: () => request('GET', `/orgs/${getOrgId()}/reports/distribution/priority`),

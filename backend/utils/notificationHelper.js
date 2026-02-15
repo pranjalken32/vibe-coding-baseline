@@ -43,4 +43,16 @@ async function notifyTaskStatusChanged({ orgId, task, oldStatus, newStatus, chan
   });
 }
 
-module.exports = { createNotification, notifyTaskAssigned, notifyTaskStatusChanged };
+async function notifyTaskMentioned({ orgId, task, mentionedUserId, mentionedBy }) {
+  await createNotification({
+    orgId,
+    recipientId: mentionedUserId,
+    type: 'task_mentioned',
+    title: 'Mentioned in a comment',
+    message: `You were mentioned in task "${task.title}"`,
+    taskId: task._id,
+    triggeredBy: mentionedBy,
+  });
+}
+
+module.exports = { createNotification, notifyTaskAssigned, notifyTaskStatusChanged, notifyTaskMentioned };
