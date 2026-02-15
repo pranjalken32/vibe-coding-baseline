@@ -387,6 +387,127 @@ function checkDuplicateCode() {
   return results;
 }
 
+// ─── METRIC 11: Structural Integrity ───
+function checkStructuralIntegrity() {
+  const results = { misplacedFiles: [], duplicateConfigs: [], platformArtifacts: [], score: 100 };
+  const ROOT_DIR = __dirname;
+
+  const allowedRootFiles = new Set([
+    'measure.js', 'README.md', 'LICENSE', '.gitignore', '.env', '.env.example',
+  ]);
+  const allowedRootDirs = new Set([
+    'backend', 'frontend', 'measurement-results', '.git', 'node_modules',
+  ]);
+
+  const rootEntries = fs.readdirSync(ROOT_DIR, { withFileTypes: true });
+  for (const entry of rootEntries) {
+    if (entry.name.startsWith('.') && entry.name !== '.gitignore' && entry.name !== '.env' && entry.name !== '.env.example') {
+      if (entry.name === '.git') continue;
+      results.platformArtifacts.push(entry.name);
+      results.score -= 5;
+      continue;
+    }
+    if (entry.isFile() && !allowedRootFiles.has(entry.name)) {
+      results.misplacedFiles.push(entry.name);
+      results.score -= 10;
+    }
+    if (entry.isDirectory() && !allowedRootDirs.has(entry.name) && !entry.name.startsWith('.')) {
+      results.misplacedFiles.push(entry.name + '/');
+      results.score -= 10;
+    }
+  }
+
+  const rootPkg = path.join(ROOT_DIR, 'package.json');
+  const backendPkg = path.join(ROOT_DIR, 'backend', 'package.json');
+  const frontendPkg = path.join(ROOT_DIR, 'frontend', 'package.json');
+  if (fs.existsSync(rootPkg) && fs.existsSync(backendPkg)) {
+    results.duplicateConfigs.push('Root package.json conflicts with backend/package.json');
+    results.score -= 15;
+  }
+  if (fs.existsSync(rootPkg) && fs.existsSync(frontendPkg)) {
+    results.duplicateConfigs.push('Root package.json conflicts with frontend/package.json');
+    results.score -= 10;
+  }
+
+  const rootServerFiles = ['index.js', 'server.js', 'app.js'].filter(f =>
+    fs.existsSync(path.join(ROOT_DIR, f))
+  );
+  const backendServer = fs.existsSync(path.join(ROOT_DIR, 'backend', 'server.js'));
+  if (rootServerFiles.length > 0 && backendServer) {
+    for (const f of rootServerFiles) {
+      results.duplicateConfigs.push(`Root ${f} conflicts with backend/server.js — duplicate entry point`);
+      results.score -= 15;
+    }
+  }
+
+  const platformFiles = ['.replit', 'replit.md', '.bolt', 'vercel.json', 'netlify.toml', '.cursorrules'];
+  for (const pf of platformFiles) {
+    if (fs.existsSync(path.join(ROOT_DIR, pf))) {
+      results.platformArtifacts.push(pf);
+      results.score -= 3;
+    }
+  }
+
+  results.score = Math.max(0, results.score);
+  return results;
+}
+
+// ─── METRIC 12: Feature Integration Check ───
+function checkFeatureIntegration() {
+  const results = { expectedFeatures: [], missingFeatures: [], score: 100 };
+  const serverFile = readFile(path.join(BACKEND_DIR, 'server.js'));
+
+  const featureChecks = [
+    {
+      name: 'Notifications',
+      checks: [
+        { desc: 'Notification model in backend/models', test: () => fs.existsSync(path.join(BACKEND_DIR, 'models', 'Notification.js')) || getAllFiles(path.join(BACKEND_DIR, 'models'), '.js').some(f => readFile(f).toLowerCase().includes('notification')) },
+        { desc: 'Notification routes in backend/routes', test: () => getAllFiles(path.join(BACKEND_DIR, 'routes'), '.js').some(f => readFile(f).toLowerCase().includes('notification')) },
+        { desc: 'Notification routes registered in server.js', test: () => serverFile.toLowerCase().includes('notification') },
+      ],
+    },
+    {
+      name: 'Reporting',
+      checks: [
+        { desc: 'Report routes in backend/routes', test: () => getAllFiles(path.join(BACKEND_DIR, 'routes'), '.js').some(f => readFile(f).toLowerCase().includes('report')) },
+        { desc: 'Report routes registered in server.js', test: () => serverFile.toLowerCase().includes('report') },
+      ],
+    },
+    {
+      name: 'Search',
+      checks: [
+        { desc: 'Search/filter in task routes', test: () => {
+          const taskRoutes = readFile(path.join(BACKEND_DIR, 'routes', 'tasks.js'));
+          return taskRoutes.includes('search') || taskRoutes.includes('$text') || taskRoutes.includes('$regex');
+        }},
+      ],
+    },
+  ];
+
+  for (const feature of featureChecks) {
+    const passedChecks = feature.checks.filter(c => {
+      try { return c.test(); } catch { return false; }
+    });
+    const allPassed = passedChecks.length === feature.checks.length;
+    const nonePassed = passedChecks.length === 0;
+    const partial = !allPassed && !nonePassed;
+
+    if (allPassed) {
+      results.expectedFeatures.push({ name: feature.name, status: 'integrated', detail: `${passedChecks.length}/${feature.checks.length} checks passed` });
+    } else if (partial) {
+      results.expectedFeatures.push({ name: feature.name, status: 'partial', detail: `${passedChecks.length}/${feature.checks.length} checks passed` });
+      const missing = feature.checks.filter(c => { try { return !c.test(); } catch { return true; } });
+      missing.forEach(m => results.missingFeatures.push(`${feature.name}: ${m.desc}`));
+      results.score -= 15;
+    } else if (nonePassed) {
+      results.expectedFeatures.push({ name: feature.name, status: 'missing', detail: 'not found in backend/frontend' });
+    }
+  }
+
+  results.score = Math.max(0, results.score);
+  return results;
+}
+
 // ─── MAIN REPORT ───
 function generateReport() {
   console.log('\n' + '='.repeat(70));
@@ -461,6 +582,33 @@ function generateReport() {
     dup.orphanedFiles.forEach(f => console.log(`    ? ${f}`));
   }
 
+  console.log('\n─── 11. Structural Integrity ───');
+  const struct = checkStructuralIntegrity();
+  metrics.structuralIntegrity = struct.score;
+  console.log(`  Score: ${struct.score}/100`);
+  if (struct.misplacedFiles.length > 0) {
+    console.log(`  Misplaced files (outside backend/ or frontend/):`);
+    struct.misplacedFiles.forEach(f => console.log(`  ✗ ${f}`));
+  }
+  if (struct.duplicateConfigs.length > 0) {
+    console.log(`  Duplicate/conflicting configs:`);
+    struct.duplicateConfigs.forEach(f => console.log(`  ✗ ${f}`));
+  }
+  if (struct.platformArtifacts.length > 0) {
+    console.log(`  Platform-specific artifacts:`);
+    struct.platformArtifacts.forEach(f => console.log(`  ✗ ${f}`));
+  }
+
+  console.log('\n─── 12. Feature Integration ───');
+  const feat = checkFeatureIntegration();
+  metrics.featureIntegration = feat.score;
+  console.log(`  Score: ${feat.score}/100`);
+  for (const f of feat.expectedFeatures) {
+    const icon = f.status === 'integrated' ? '✓' : f.status === 'partial' ? '◐' : '○';
+    console.log(`  ${icon} ${f.name}: ${f.status} (${f.detail})`);
+  }
+  feat.missingFeatures.forEach(m => console.log(`  ✗ ${m}`));
+
   // ─── COMPOSITE SCORE ───
   const numericScores = Object.values(metrics).map(v => parseFloat(v) || 0);
   const compositeScore = (numericScores.reduce((a, b) => a + b, 0) / numericScores.length).toFixed(1);
@@ -480,6 +628,8 @@ function generateReport() {
   console.log(`    Security:               ${metrics.security}/100`);
   console.log(`    Code Conventions:       ${metrics.codeConventions}/100`);
   console.log(`    Duplicate/Dead Code:    ${metrics.duplicateCode}/100`);
+  console.log(`    Structural Integrity:   ${metrics.structuralIntegrity}/100`);
+  console.log(`    Feature Integration:    ${metrics.featureIntegration}/100`);
 
   console.log('\n' + '='.repeat(70));
 
@@ -499,6 +649,8 @@ function generateReport() {
       security: sec,
       codeConventions: conv,
       duplicateCode: dup,
+      structuralIntegrity: struct,
+      featureIntegration: feat,
     },
   };
 
