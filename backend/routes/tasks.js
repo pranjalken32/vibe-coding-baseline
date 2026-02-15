@@ -1,5 +1,6 @@
 const express = require('express');
 const Task = require('../models/Task');
+const TaskTemplate = require('../models/TaskTemplate');
 const TaskActivity = require('../models/TaskActivity');
 const User = require('../models/User');
 const { authMiddleware } = require('../middleware/auth');
@@ -10,6 +11,49 @@ const { notifyTaskAssigned, notifyTaskStatusChanged, notifyTaskMentioned } = req
 const router = express.Router();
 
 router.use(authMiddleware);
+
+// New route to create a task from a template
+router.post('/from-template', checkPermission('create', 'tasks'), async (req, res) => {
+  try {
+    const { orgId, id: userId } = req.user;
+    const { templateId } = req.body;
+
+    const template = await TaskTemplate.findById(templateId);
+    if (!template) {
+      return res.status(404).json({ success: false, data: null, error: 'Template not found' });
+    }
+
+    const taskData = {
+      orgId,
+      title: template.title,
+      description: template.description,
+      priority: template.priority.toLowerCase(),
+      assigneeId: template.assignee,
+      createdBy: userId,
+      templateId: template._id,
+    };
+
+    const task = await Task.create(taskData);
+
+    await logAudit({
+      orgId,
+      userId,
+      action: 'create_from_template',
+      resource: 'task',
+      resourceId: task._id,
+      changes: { templateId: template._id },
+      ipAddress: req.ip,
+    });
+
+    if (task.assigneeId) {
+      await notifyTaskAssigned({ orgId, task, assignedBy: userId });
+    }
+
+    res.status(201).json({ success: true, data: task, error: null });
+  } catch (err) {
+    res.status(500).json({ success: false, data: null, error: err.message });
+  }
+});
 
 function extractMentionEmails(body) {
   if (!body || typeof body !== 'string') return [];
@@ -157,10 +201,22 @@ router.get('/:id', checkPermission('read', 'tasks'), async (req, res) => {
 router.post('/', checkPermission('create', 'tasks'), async (req, res) => {
   try {
     const { orgId, id: userId } = req.user;
-    const { title, description, status, priority, assigneeId, tags, dueDate } = req.body;
+    const { title, description, status, priority, assigneeId, tags, dueDate, isRecurring, recurringFrequency } = req.body;
 
     if (!title) {
       return res.status(400).json({ success: false, data: null, error: 'Title is required' });
+    }
+
+    let nextRecurringDate = null;
+    if (isRecurring && recurringFrequency) {
+        const now = new Date();
+        if (recurringFrequency === 'daily') {
+            nextRecurringDate = new Date(now.setDate(now.getDate() + 1));
+        } else if (recurringFrequency === 'weekly') {
+            nextRecurringDate = new Date(now.setDate(now.getDate() + 7));
+        } else if (recurringFrequency === 'monthly') {
+            nextRecurringDate = new Date(now.setMonth(now.getMonth() + 1));
+        }
     }
 
     const task = await Task.create({
@@ -173,6 +229,9 @@ router.post('/', checkPermission('create', 'tasks'), async (req, res) => {
       createdBy: userId,
       tags,
       dueDate,
+      isRecurring,
+      recurringFrequency,
+      nextRecurringDate,
     });
 
     if (assigneeId) {

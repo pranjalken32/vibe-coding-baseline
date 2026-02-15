@@ -34,8 +34,16 @@ export const api = {
   updateTask: (id, body) => request('PUT', `/orgs/${getOrgId()}/tasks/${id}`, body),
   deleteTask: (id) => request('DELETE', `/orgs/${getOrgId()}/tasks/${id}`),
 
+  createTaskFromTemplate: (body) => request('POST', `/orgs/${getOrgId()}/tasks/from-template`, body),
+
   getTaskActivity: (id, query = '') => request('GET', `/orgs/${getOrgId()}/tasks/${id}/activity${query}`),
   addTaskComment: (id, body) => request('POST', `/orgs/${getOrgId()}/tasks/${id}/comments`, body),
+
+  // Task Templates
+  getTaskTemplates: () => request('GET', '/templates'),
+  createTaskTemplate: (body) => request('POST', '/templates', body),
+  updateTaskTemplate: (id, body) => request('PUT', `/templates/${id}`, body),
+  deleteTaskTemplate: (id) => request('DELETE', `/templates/${id}`),
 
   // Reports
   getStatusDistribution: () => request('GET', `/orgs/${getOrgId()}/reports/distribution/status`),

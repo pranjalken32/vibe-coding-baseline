@@ -11,6 +11,10 @@ const taskSchema = new mongoose.Schema({
   tags: [{ type: String }],
   dueDate: { type: Date },
   completedAt: { type: Date },
+  templateId: { type: mongoose.Schema.Types.ObjectId, ref: 'TaskTemplate' },
+  isRecurring: { type: Boolean, default: false },
+  recurringFrequency: { type: String, enum: ['daily', 'weekly', 'monthly'], default: null },
+  nextRecurringDate: { type: Date, default: null },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Task', taskSchema);
