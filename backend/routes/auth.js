@@ -28,7 +28,7 @@ router.post('/register', async (req, res) => {
       return res.status(409).json({ success: false, data: null, error: 'User already exists in this organization' });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 12);
 
     const isFirstUser = (await User.countDocuments({ orgId: org._id })) === 0;
 
