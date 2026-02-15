@@ -8,6 +8,7 @@ const taskRoutes = require('./routes/tasks');
 const dashboardRoutes = require('./routes/dashboard');
 const auditLogRoutes = require('./routes/auditLogs');
 const userRoutes = require('./routes/users');
+const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use('/api/v1/orgs/:orgId/tasks', taskRoutes);
 app.use('/api/v1/orgs/:orgId/dashboard', dashboardRoutes);
 app.use('/api/v1/orgs/:orgId/audit-logs', auditLogRoutes);
 app.use('/api/v1/orgs/:orgId/users', userRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 
 app.get('/api/v1/health', (req, res) => {
   res.json({ success: true, data: { status: 'ok' }, error: null });

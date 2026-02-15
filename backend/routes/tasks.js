@@ -3,6 +3,7 @@ const Task = require('../models/Task');
 const { authMiddleware } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
 const { logAudit } = require('../utils/auditHelper');
+const { notifyTaskAssigned, notifyTaskStatusChanged } = require('../utils/notificationHelper');
 
 const router = express.Router();
 
@@ -83,6 +84,10 @@ router.post('/', checkPermission('create', 'tasks'), async (req, res) => {
       ipAddress: req.ip,
     });
 
+    if (assigneeId) {
+      await notifyTaskAssigned({ orgId, task, assigneeId, assignedBy: userId });
+    }
+
     res.status(201).json({ success: true, data: task, error: null });
   } catch (err) {
     res.status(500).json({ success: false, data: null, error: err.message });
@@ -100,6 +105,8 @@ router.put('/:id', checkPermission('update', 'tasks'), async (req, res) => {
     }
 
     const oldValues = { status: task.status, priority: task.priority, title: task.title };
+    const oldAssigneeId = task.assigneeId ? String(task.assigneeId) : null;
+    const oldStatus = task.status;
 
     if (updates.status === 'done' && task.status !== 'done') {
       updates.completedAt = new Date();
@@ -117,6 +124,14 @@ router.put('/:id', checkPermission('update', 'tasks'), async (req, res) => {
       changes: { before: oldValues, after: updates },
       ipAddress: req.ip,
     });
+
+    if (updates.assigneeId && String(updates.assigneeId) !== oldAssigneeId) {
+      await notifyTaskAssigned({ orgId, task, assigneeId: updates.assigneeId, assignedBy: userId });
+    }
+
+    if (updates.status && updates.status !== oldStatus) {
+      await notifyTaskStatusChanged({ orgId, task, oldStatus, newStatus: updates.status, changedBy: userId });
+    }
 
     res.json({ success: true, data: task, error: null });
   } catch (err) {
