@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Tasks from './pages/Tasks';
+import Reports from './pages/Reports';
 import AuditLogs from './pages/AuditLogs';
 import NotificationPreferences from './pages/NotificationPreferences';
 
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
             <Route path="/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
             <Route path="/notification-preferences" element={<ProtectedRoute><NotificationPreferences /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/" />} />

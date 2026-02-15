@@ -12,11 +12,19 @@ router.use(authMiddleware);
 router.get('/', checkPermission('read', 'tasks'), async (req, res) => {
   try {
     const { orgId } = req.user;
-    const { page = 1, limit = 20, status, priority, assigneeId } = req.query;
+    const { page = 1, limit = 20, status, priority, assigneeId, search } = req.query;
     const filter = { orgId };
     if (status) filter.status = status;
     if (priority) filter.priority = priority;
     if (assigneeId) filter.assigneeId = assigneeId;
+    
+    // Add search functionality
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+      ];
+    }
 
     const total = await Task.countDocuments(filter);
     const tasks = await Task.find(filter)

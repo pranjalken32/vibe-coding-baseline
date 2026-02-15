@@ -34,6 +34,21 @@ export const api = {
   updateTask: (id, body) => request('PUT', `/orgs/${getOrgId()}/tasks/${id}`, body),
   deleteTask: (id) => request('DELETE', `/orgs/${getOrgId()}/tasks/${id}`),
 
+  // Reports
+  getStatusDistribution: () => request('GET', `/orgs/${getOrgId()}/reports/distribution/status`),
+  getPriorityDistribution: () => request('GET', `/orgs/${getOrgId()}/reports/distribution/priority`),
+  getCompletedOverTime: (days = 30) => request('GET', `/orgs/${getOrgId()}/reports/completed-over-time?days=${days}`),
+  exportTasksCSV: () => {
+    const token = localStorage.getItem('token');
+    const url = `${API_BASE}/orgs/${getOrgId()}/reports/export/csv`;
+    return fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(res => {
+      if (!res.ok) throw new Error('Export failed');
+      return res.blob();
+    });
+  },
+
   getDashboard: () => request('GET', `/orgs/${getOrgId()}/dashboard/stats`),
   getAuditLogs: (query = '') => request('GET', `/orgs/${getOrgId()}/audit-logs${query}`),
   getUsers: () => request('GET', `/orgs/${getOrgId()}/users`),

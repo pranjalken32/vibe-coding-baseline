@@ -14,6 +14,7 @@ export default function Header() {
         <div className="nav-links">
           <Link to="/">Dashboard</Link>
           <Link to="/tasks">Tasks</Link>
+          <Link to="/reports">Reports</Link>
           {(user.role === 'admin' || user.role === 'manager') && (
             <Link to="/audit-logs">Audit Logs</Link>
           )}
