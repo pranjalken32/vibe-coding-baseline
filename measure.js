@@ -453,21 +453,42 @@ function checkStructuralIntegrity() {
 }
 
 // ─── METRIC 12: Feature Integration Check ───
+// Only evaluates features that show evidence of being ATTEMPTED (files exist
+// anywhere in repo). Features not yet built by future devs are skipped.
 function checkFeatureIntegration() {
   const results = { expectedFeatures: [], missingFeatures: [], score: 100 };
   const serverFile = readFile(path.join(BACKEND_DIR, 'server.js'));
+  const ROOT_DIR = __dirname;
+  const excludeFromDetect = new Set(['measure.js', 'package.json', 'package-lock.json', 'replit.md', '.replit']);
+  const featureFiles = getAllFiles(ROOT_DIR, null).filter(f => {
+    const base = path.basename(f);
+    return !f.includes('node_modules') && !f.includes('.git') && !f.includes('measurement-results') && !excludeFromDetect.has(base);
+  });
+  const featureFileNames = featureFiles.map(f => path.basename(f).toLowerCase());
+  const featureContents = featureFiles.map(f => readFile(f).toLowerCase());
 
   const featureChecks = [
     {
       name: 'Notifications',
+      detect: () => {
+        const hasNotifFile = featureFileNames.some(f => f.includes('notif'));
+        const hasNotifComponent = featureContents.some(c => c.includes('notification') && (c.includes('schema') || c.includes('router.') || c.includes('bell') || c.includes('usestate')));
+        return hasNotifFile || hasNotifComponent;
+      },
       checks: [
-        { desc: 'Notification model in backend/models', test: () => fs.existsSync(path.join(BACKEND_DIR, 'models', 'Notification.js')) || getAllFiles(path.join(BACKEND_DIR, 'models'), '.js').some(f => readFile(f).toLowerCase().includes('notification')) },
+        { desc: 'Notification model in backend/models', test: () => fs.existsSync(path.join(BACKEND_DIR, 'models', 'Notification.js')) || getAllFiles(path.join(BACKEND_DIR, 'models'), '.js').some(f => { const c = readFile(f); return c.includes('notification') && c.includes('Schema'); }) },
         { desc: 'Notification routes in backend/routes', test: () => getAllFiles(path.join(BACKEND_DIR, 'routes'), '.js').some(f => readFile(f).toLowerCase().includes('notification')) },
         { desc: 'Notification routes registered in server.js', test: () => serverFile.toLowerCase().includes('notification') },
       ],
     },
     {
       name: 'Reporting',
+      detect: () => {
+        const hasReportFile = featureFileNames.some(f => f.includes('report') && !f.includes('measure'));
+        const hasChartLib = featureContents.some(c => c.includes('recharts') || c.includes('chart.js') || c.includes('chartjs'));
+        const hasReportComponent = featureContents.some(c => (c.includes('report') && c.includes('csv')) || (c.includes('report') && c.includes('chart')));
+        return hasReportFile || hasChartLib || hasReportComponent;
+      },
       checks: [
         { desc: 'Report routes in backend/routes', test: () => getAllFiles(path.join(BACKEND_DIR, 'routes'), '.js').some(f => readFile(f).toLowerCase().includes('report')) },
         { desc: 'Report routes registered in server.js', test: () => serverFile.toLowerCase().includes('report') },
@@ -475,6 +496,12 @@ function checkFeatureIntegration() {
     },
     {
       name: 'Search',
+      detect: () => {
+        const hasSearchFile = featureFileNames.some(f => f.includes('search'));
+        const hasSearchFeature = featureContents.some(c => (c.includes('$text') || c.includes('$regex') || c.includes('text index')) && c.includes('search'));
+        const hasDebounceSearch = featureContents.some(c => c.includes('debounce') && c.includes('search'));
+        return hasSearchFile || hasSearchFeature || hasDebounceSearch;
+      },
       checks: [
         { desc: 'Search/filter in task routes', test: () => {
           const taskRoutes = readFile(path.join(BACKEND_DIR, 'routes', 'tasks.js'));
@@ -484,23 +511,34 @@ function checkFeatureIntegration() {
     },
   ];
 
+  let evaluatedCount = 0;
   for (const feature of featureChecks) {
+    let attempted = false;
+    try { attempted = feature.detect(); } catch { attempted = false; }
+
+    if (!attempted) {
+      results.expectedFeatures.push({ name: feature.name, status: 'not_attempted', detail: 'no evidence in repo yet (future dev)' });
+      continue;
+    }
+
+    evaluatedCount++;
     const passedChecks = feature.checks.filter(c => {
       try { return c.test(); } catch { return false; }
     });
     const allPassed = passedChecks.length === feature.checks.length;
     const nonePassed = passedChecks.length === 0;
-    const partial = !allPassed && !nonePassed;
 
     if (allPassed) {
       results.expectedFeatures.push({ name: feature.name, status: 'integrated', detail: `${passedChecks.length}/${feature.checks.length} checks passed` });
-    } else if (partial) {
+    } else if (!nonePassed) {
       results.expectedFeatures.push({ name: feature.name, status: 'partial', detail: `${passedChecks.length}/${feature.checks.length} checks passed` });
       const missing = feature.checks.filter(c => { try { return !c.test(); } catch { return true; } });
       missing.forEach(m => results.missingFeatures.push(`${feature.name}: ${m.desc}`));
-      results.score -= 15;
-    } else if (nonePassed) {
-      results.expectedFeatures.push({ name: feature.name, status: 'missing', detail: 'not found in backend/frontend' });
+      results.score -= Math.round(30 / Math.max(evaluatedCount, 1));
+    } else {
+      results.expectedFeatures.push({ name: feature.name, status: 'not_integrated', detail: 'attempted but not in backend/frontend' });
+      results.missingFeatures.push(`${feature.name}: code exists outside backend/frontend but not integrated`);
+      results.score -= Math.round(40 / Math.max(evaluatedCount, 1));
     }
   }
 
