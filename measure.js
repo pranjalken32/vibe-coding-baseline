@@ -509,6 +509,34 @@ function checkFeatureIntegration() {
         }},
       ],
     },
+    {
+      name: 'Comments',
+      detect: () => {
+        const hasCommentFile = featureFileNames.some(f => f.includes('comment') || f.includes('activity'));
+        const hasCommentRoute = featureContents.some(c => c.includes('comment') && (c.includes('router.get') || c.includes('router.post')) && !c.includes('// comment'));
+        const hasCommentModel = featureContents.some(c => c.includes('comment') && c.includes('schema') && c.includes('mongoose'));
+        return hasCommentFile || hasCommentRoute || hasCommentModel;
+      },
+      checks: [
+        { desc: 'Comment model in backend/models', test: () => getAllFiles(path.join(BACKEND_DIR, 'models'), '.js').some(f => { const c = readFile(f).toLowerCase(); return c.includes('comment') && c.includes('schema'); }) },
+        { desc: 'Comment routes in backend/routes', test: () => getAllFiles(path.join(BACKEND_DIR, 'routes'), '.js').some(f => { const c = readFile(f).toLowerCase(); return c.includes('comment') && (c.includes('router.get') || c.includes('router.post')); }) },
+        { desc: 'Comment routes registered in server.js', test: () => serverFile.toLowerCase().includes('comment') },
+      ],
+    },
+    {
+      name: 'Templates',
+      detect: () => {
+        const hasTemplateFile = featureFileNames.some(f => f.includes('template') || f.includes('recurring'));
+        const hasTemplateRoute = featureContents.some(c => (c.includes('template') || c.includes('recurring')) && (c.includes('router.get') || c.includes('router.post')));
+        const hasTemplateModel = featureContents.some(c => (c.includes('template') || c.includes('recurring')) && c.includes('schema') && c.includes('mongoose'));
+        return hasTemplateFile || hasTemplateRoute || hasTemplateModel;
+      },
+      checks: [
+        { desc: 'Template/Recurring model in backend/models', test: () => getAllFiles(path.join(BACKEND_DIR, 'models'), '.js').some(f => { const c = readFile(f).toLowerCase(); return (c.includes('template') || c.includes('recurring')) && c.includes('schema'); }) },
+        { desc: 'Template/Recurring routes in backend/routes', test: () => getAllFiles(path.join(BACKEND_DIR, 'routes'), '.js').some(f => { const c = readFile(f).toLowerCase(); return (c.includes('template') || c.includes('recurring')) && (c.includes('router.get') || c.includes('router.post')); }) },
+        { desc: 'Template/Recurring routes registered in server.js', test: () => serverFile.toLowerCase().includes('template') || serverFile.toLowerCase().includes('recurring') },
+      ],
+    },
   ];
 
   const featureScores = [];
